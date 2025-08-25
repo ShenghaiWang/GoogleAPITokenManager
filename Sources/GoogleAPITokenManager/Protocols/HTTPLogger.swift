@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// Logger protocol for HTTP operations
 public protocol HTTPLogger: Actor {

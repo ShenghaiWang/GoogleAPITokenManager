@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// URLSession-based HTTP client implementation
 public actor URLSessionHTTPClient: HTTPClient {

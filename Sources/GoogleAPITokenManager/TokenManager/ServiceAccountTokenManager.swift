@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// Service Account Token Manager for server-to-server authentication
 public actor ServiceAccountTokenManager: TokenManager {

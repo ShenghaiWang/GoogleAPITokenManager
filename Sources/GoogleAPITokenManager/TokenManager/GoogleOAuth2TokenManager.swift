@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// Google OAuth2 token manager implementation
 public actor GoogleOAuth2TokenManager: TokenManager {
@@ -27,7 +30,7 @@ public actor GoogleOAuth2TokenManager: TokenManager {
     public init(clientId: String,
                 clientSecret: String,
                 redirectURI: String,
-                tokenStorage: any TokenStorage = InMemoeryTokenStorage(),
+                tokenStorage: (any TokenStorage)? = InMemoeryTokenStorage(),
                 httpClient: any HTTPClient) {
         self.clientId = clientId
         self.clientSecret = clientSecret

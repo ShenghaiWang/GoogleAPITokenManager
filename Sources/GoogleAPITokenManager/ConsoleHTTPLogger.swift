@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// Default implementation that logs to console
 public actor ConsoleHTTPLogger: HTTPLogger {

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// Protocol for HTTP client implementations
 public protocol HTTPClient: Actor {

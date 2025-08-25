@@ -6,7 +6,17 @@ public actor InMemoeryTokenStorage: TokenStorage {
     private var refreshToken: String?
     private var expiresIn: TimeInterval?
 
-    public func storeTokens(accessToken: String, refreshToken: String?, expiresIn: TimeInterval?) throws {
+    public init(accessToken: String? = nil,
+                refreshToken: String? = nil,
+                expiresIn: TimeInterval? = nil) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.expiresIn = expiresIn
+    }
+
+    public func storeTokens(accessToken: String,
+                            refreshToken: String?,
+                            expiresIn: TimeInterval?) throws {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.expiresIn = expiresIn
