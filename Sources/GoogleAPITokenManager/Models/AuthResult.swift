@@ -1,7 +1,7 @@
 import Foundation
 
 /// Result of authentication flow
-public struct AuthResult {
+public struct AuthResult: Sendable {
     public let accessToken: String
     public let refreshToken: String?
     public let expiresIn: TimeInterval?

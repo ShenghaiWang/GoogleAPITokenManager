@@ -102,6 +102,19 @@ public actor GoogleOAuth2TokenManager: TokenManager {
     }
 
     public func authenticate(scopes: [String]) async throws -> AuthResult {
+        #if DEBUG
+        let authURL = buildAuthorizationURL(scopes: scopes)
+        print("🔐 Please visit this URL to authorize the application:")
+        print(authURL.absoluteString)
+        print("\n📋 After authorization, copy the authorization code and paste it here:")
+
+        // Read authorization code from user input
+        guard let authCode = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !authCode.isEmpty else {
+            fatalError("❌ No authorization code provided")
+        }
+        return try await exchangeAuthorizationCode(authCode)
+        #endif
         // In a real implementation, you would:
         // 1. Generate authorization URL using buildAuthorizationURL(scopes: scopes)
         // 2. Open the authorization URL in a web view or system browser
