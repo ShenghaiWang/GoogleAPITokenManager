@@ -19,7 +19,7 @@ public actor GoogleOAuth2TokenManager: TokenManager {
                 clientSecret: String,
                 redirectURI: String,
                 tokenStorage: (any TokenStorage)? = KeychainTokenStorage(),
-                httpClient: any HTTPClient) {
+                httpClient: any HTTPClient = URLSessionHTTPClient()) {
         self.clientId = clientId
         self.clientSecret = clientSecret
         self.redirectURI = redirectURI
@@ -31,7 +31,7 @@ public actor GoogleOAuth2TokenManager: TokenManager {
                 clientSecret: String,
                 redirectURI: String,
                 tokenStorage: (any TokenStorage)? = InMemoeryTokenStorage(),
-                httpClient: any HTTPClient) {
+                httpClient: any HTTPClient = URLSessionHTTPClient()) {
         self.clientId = clientId
         self.clientSecret = clientSecret
         self.redirectURI = redirectURI
