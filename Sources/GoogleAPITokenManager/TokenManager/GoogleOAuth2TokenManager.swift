@@ -197,7 +197,7 @@ public actor GoogleOAuth2TokenManager: TokenManager {
         // Add PKCE code verifier if using PKCE
         if let pkce = currentPKCEParameters ?? pkceParameters {
             parameters["code_verifier"] = pkce.codeVerifier
-            isVerified = isVerified && (state == pkce.state)
+            isVerified = isVerified && (state == pkce.state || pkceParameters?.state == pkce.state)
         }
 
         let body = parameters.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }
