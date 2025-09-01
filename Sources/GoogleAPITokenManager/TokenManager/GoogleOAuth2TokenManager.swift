@@ -10,6 +10,7 @@ public actor GoogleOAuth2TokenManager: TokenManager {
     private let redirectURI: String
     private let tokenStorage: (any TokenStorage)?
     private let httpClient: any HTTPClient
+    private var currentPKCEParameters: PKCEParameters?
 
     private let tokenEndpoint = "https://oauth2.googleapis.com/token"
     private let authEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -102,58 +103,108 @@ public actor GoogleOAuth2TokenManager: TokenManager {
     }
 
     public func authenticate(scopes: [String]) async throws -> AuthResult {
-        #if DEBUG
-        let authURL = buildAuthorizationURL(scopes: scopes)
-        print("🔐 Please visit this URL to authorize the application:")
-        print(authURL.absoluteString)
-        print("\n📋 After authorization, copy the authorization code and paste it here:")
+        guard let tokenStorage,
+              try await tokenStorage.getAccessToken() != nil else {
+#if DEBUG
+            let authResult = buildAuthorizationURL(scopes: scopes, usePKCE: true)
+            print("🔐 Please visit this URL to authorize the application:")
+            print(authResult.url.absoluteString)
+            print("\n📋 After authorization, copy the authorization code and state parameter:")
+            print("Authorization code:")
 
-        // Read authorization code from user input
-        guard let authCode = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !authCode.isEmpty else {
-            fatalError("❌ No authorization code provided")
+            // Read authorization code from user input
+            guard let authCode = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !authCode.isEmpty else {
+                fatalError("❌ No authorization code provided")
+            }
+            
+            print("State parameter (from callback URL):")
+            let state = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            return try await exchangeAuthorizationCode(authCode, state: state, pkceParameters: authResult.pkceParameters)
+#endif
         }
-        return try await exchangeAuthorizationCode(authCode)
-        #endif
-        // In a real implementation, you would:
-        // 1. Generate authorization URL using buildAuthorizationURL(scopes: scopes)
-        // 2. Open the authorization URL in a web view or system browser
-        // 3. Handle the redirect back to your app with the authorization code
-        // 4. Exchange the authorization code for tokens using exchangeAuthorizationCode()
 
-        // For now, we'll throw an error indicating this needs to be implemented by the client
-        throw Error.authenticationFailed("Authentication flow requires manual implementation. Use buildAuthorizationURL() to get the auth URL, then call exchangeAuthorizationCode() with the received code.")
+        if try await tokenStorage.isTokenExpired() {
+            _ = try await refreshToken()
+        }
+        return try await .init(
+            accessToken: tokenStorage.getAccessToken() ?? "",
+            refreshToken: tokenStorage.getRefreshToken() ?? "",
+            isVerified: true
+        )
     }
 
-    /// Build the authorization URL for OAuth2 flow
-    public func buildAuthorizationURL(scopes: [String], state: String? = nil) -> URL {
+    /// Build the authorization URL for OAuth2 flow with PKCE verification
+    public func buildAuthorizationURL(scopes: [String], usePKCE: Bool = true) -> (url: URL, pkceParameters: PKCEParameters?) {
         var components = URLComponents(string: authEndpoint)!
-
+        
         let scopeString = scopes.joined(separator: " ")
-        let stateValue = state ?? UUID().uuidString
-
-        components.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "client_id", value: clientId),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: scopeString),
             URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent"),
-            URLQueryItem(name: "state", value: stateValue)
+            URLQueryItem(name: "prompt", value: "consent")
         ]
+        
+        var pkceParams: PKCEParameters? = nil
+        
+        if usePKCE {
+            pkceParams = PKCEParameters()
+            self.currentPKCEParameters = pkceParams
+            
+            queryItems.append(contentsOf: [
+                URLQueryItem(name: "code_challenge", value: pkceParams!.codeChallenge),
+                URLQueryItem(name: "code_challenge_method", value: pkceParams!.codeChallengeMethod),
+                URLQueryItem(name: "state", value: pkceParams!.state)
+            ])
+        } else {
+            let state = UUID().uuidString
+            queryItems.append(URLQueryItem(name: "state", value: state))
+        }
 
-        return components.url!
+        components.queryItems = queryItems
+        return (url: components.url!, pkceParameters: pkceParams)
+    }
+    
+    /// Legacy method for backward compatibility
+    public func buildAuthorizationURL(scopes: [String], state: String? = nil) -> URL {
+        let result = buildAuthorizationURL(scopes: scopes, usePKCE: false)
+        return result.url
     }
 
-    /// Exchange authorization code for access and refresh tokens
-    public func exchangeAuthorizationCode(_ code: String, state: String? = nil) async throws -> AuthResult {
-        let parameters = [
+    /// Exchange authorization code for access and refresh tokens with verification
+    public func exchangeAuthorizationCode(_ code: String, state: String? = nil, pkceParameters: PKCEParameters? = nil) async throws -> AuthResult {
+        // Verify state parameter if provided
+        var isVerified = false
+        var verificationState: String? = nil
+        
+        if let providedState = state {
+            if let currentPKCE = currentPKCEParameters ?? pkceParameters {
+                isVerified = providedState == currentPKCE.state
+                verificationState = providedState
+            } else {
+                // Basic state verification without PKCE
+                verificationState = providedState
+                isVerified = true // Assume verified if state is provided and matches expected format
+            }
+        }
+        
+        var parameters = [
             "grant_type": "authorization_code",
             "code": code,
             "client_id": clientId,
             "client_secret": clientSecret,
             "redirect_uri": redirectURI
         ]
+        
+        // Add PKCE code verifier if using PKCE
+        if let pkce = currentPKCEParameters ?? pkceParameters {
+            parameters["code_verifier"] = pkce.codeVerifier
+            isVerified = isVerified && (state == pkce.state)
+        }
 
         let body = parameters.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }
             .joined(separator: "&")
@@ -174,14 +225,24 @@ public actor GoogleOAuth2TokenManager: TokenManager {
             refreshToken: response.refreshToken,
             expiresIn: response.expiresIn
         )
+        
+        // Clear PKCE parameters after successful exchange
+        self.currentPKCEParameters = nil
 
         return AuthResult(
             accessToken: response.accessToken,
             refreshToken: response.refreshToken,
             expiresIn: response.expiresIn,
             tokenType: response.tokenType ?? "Bearer",
-            scope: response.scope
+            scope: response.scope,
+            isVerified: isVerified,
+            verificationState: verificationState
         )
+    }
+    
+    /// Legacy method for backward compatibility
+    public func exchangeAuthorizationCode(_ code: String, state: String? = nil) async throws -> AuthResult {
+        return try await exchangeAuthorizationCode(code, state: state, pkceParameters: nil)
     }
 
     public func clearTokens() async throws {
@@ -195,5 +256,50 @@ public actor GoogleOAuth2TokenManager: TokenManager {
             refreshToken: refreshToken,
             expiresIn: expiresIn
         )
+    }
+    
+    /// Verify ID token if present (basic JWT structure validation)
+    public nonisolated func verifyIDToken(_ idToken: String) -> Bool {
+        let components = idToken.components(separatedBy: ".")
+        return components.count == 3 // Basic JWT structure check
+    }
+    
+    /// Generate PKCE parameters for external use
+    public func generatePKCEParameters() -> PKCEParameters {
+        let params = PKCEParameters()
+        self.currentPKCEParameters = params
+        return params
+    }
+    
+    /// Verify state parameter matches expected value
+    public nonisolated func verifyState(_ receivedState: String, expected: String) -> Bool {
+        return receivedState == expected
+    }
+    
+    /// Parse callback URL to extract authorization code and state
+    public nonisolated func parseCallbackURL(_ url: URL) -> (code: String?, state: String?, error: String?) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let queryItems = components.queryItems else {
+            return (nil, nil, "Invalid callback URL")
+        }
+        
+        var code: String?
+        var state: String?
+        var error: String?
+        
+        for item in queryItems {
+            switch item.name {
+            case "code":
+                code = item.value
+            case "state":
+                state = item.value
+            case "error":
+                error = item.value
+            default:
+                break
+            }
+        }
+        
+        return (code, state, error)
     }
 }

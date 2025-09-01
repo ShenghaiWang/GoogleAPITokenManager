@@ -6,6 +6,7 @@ struct TokenResponse: Codable {
     let expiresIn: TimeInterval?
     let tokenType: String?
     let scope: String?
+    let idToken: String?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
@@ -13,6 +14,7 @@ struct TokenResponse: Codable {
         case expiresIn = "expires_in"
         case tokenType = "token_type"
         case scope
+        case idToken = "id_token"
     }
 }
 

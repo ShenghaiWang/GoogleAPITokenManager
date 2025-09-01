@@ -18,7 +18,8 @@ let package = Package(
             targets: ["GoogleAPITokenManager"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.0.0")
+        .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -26,7 +27,8 @@ let package = Package(
         .target(
             name: "GoogleAPITokenManager",
             dependencies: [
-                .product(name: "JWTKit", package: "jwt-kit")
+                .product(name: "JWTKit", package: "jwt-kit"),
+                .product(name: "Crypto", package: "swift-crypto")
             ]
         ),
         .testTarget(
