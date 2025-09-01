@@ -168,12 +168,6 @@ public actor GoogleOAuth2TokenManager: TokenManager {
         components.queryItems = queryItems
         return (url: components.url!, pkceParameters: pkceParams)
     }
-    
-    /// Legacy method for backward compatibility
-    public func buildAuthorizationURL(scopes: [String], state: String? = nil) -> URL {
-        let result = buildAuthorizationURL(scopes: scopes, usePKCE: false)
-        return result.url
-    }
 
     /// Exchange authorization code for access and refresh tokens with verification
     public func exchangeAuthorizationCode(_ code: String, state: String? = nil, pkceParameters: PKCEParameters? = nil) async throws -> AuthResult {
@@ -181,7 +175,7 @@ public actor GoogleOAuth2TokenManager: TokenManager {
         var isVerified = false
         var verificationState: String? = nil
         
-        if let providedState = state {
+        if let providedState = state ?? pkceParameters?.state {
             if let currentPKCE = currentPKCEParameters ?? pkceParameters {
                 isVerified = providedState == currentPKCE.state
                 verificationState = providedState
@@ -238,11 +232,6 @@ public actor GoogleOAuth2TokenManager: TokenManager {
             isVerified: isVerified,
             verificationState: verificationState
         )
-    }
-    
-    /// Legacy method for backward compatibility
-    public func exchangeAuthorizationCode(_ code: String, state: String? = nil) async throws -> AuthResult {
-        return try await exchangeAuthorizationCode(code, state: state, pkceParameters: nil)
     }
 
     public func clearTokens() async throws {
