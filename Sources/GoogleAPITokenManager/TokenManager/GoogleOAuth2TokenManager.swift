@@ -122,6 +122,8 @@ public actor GoogleOAuth2TokenManager: TokenManager {
             let state = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines)
             
             return try await exchangeAuthorizationCode(authCode, state: state, pkceParameters: authResult.pkceParameters)
+#else
+            throw Error.invalidOAuthflow
 #endif
         }
 

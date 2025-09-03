@@ -12,4 +12,5 @@ public enum Error: Swift.Error {
     case rateLimitExceeded(retryAfter: TimeInterval)
     case apiError(code: Int, message: String, details: String?)
     case networkError(Swift.Error)
+    case invalidOAuthflow
 }
